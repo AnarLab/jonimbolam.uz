@@ -3,13 +3,16 @@ export type ApiConfig = {
 }
 
 export function getApiBaseUrl(): string {
-  // In Docker: server-side requests must use the internal service name (backend:8000),
-  // but browser requests must use localhost-mapped ports.
   const isServer = typeof window === "undefined"
-  const base =
-    (isServer ? process.env.API_INTERNAL_BASE_URL : undefined) ||
-    process.env.NEXT_PUBLIC_API_BASE_URL ||
-    "http://localhost:8000"
+  if (!isServer) {
+    // Browser should call same-origin (nginx will route /api/* to Django).
+    // This avoids "localhost" leaks in production builds.
+    return ""
+  }
+
+  // Server-side (SSR/RSC) runs inside the container network.
+  const env = (globalThis as any)?.process?.env as Record<string, string | undefined> | undefined
+  const base = env?.API_INTERNAL_BASE_URL || env?.NEXT_PUBLIC_API_BASE_URL || "http://backend:8000"
   return base.replace(/\/$/, "")
 }
 
